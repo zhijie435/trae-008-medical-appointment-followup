@@ -2,7 +2,7 @@
   <el-container class="layout-container">
     <el-aside width="220px" class="aside">
       <div class="logo">
-        <el-icon :size="28" color="#409EFF"><Hospital /></el-icon>
+        <el-icon :size="28" color="#409EFF"><FirstAidKit /></el-icon>
         <span class="logo-text">医疗随访系统</span>
       </div>
       <el-menu

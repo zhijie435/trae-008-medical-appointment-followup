@@ -74,6 +74,19 @@ async function followupRoutes(fastify, options) {
     return { code: 0, data: followups };
   });
 
+  fastify.get('/today/pending', async (request, reply) => {
+    const today = new Date().toISOString().split('T')[0];
+    const followups = db.prepare(`
+      SELECT f.*, p.name as patient_name, p.gender, p.age, p.phone, p.diagnosis
+      FROM followups f
+      LEFT JOIN patients p ON f.patient_id = p.id
+      WHERE f.followup_date = ? AND f.status = 'pending'
+      ORDER BY f.created_at ASC
+    `).all(today);
+
+    return { code: 0, data: followups };
+  });
+
   fastify.post('/', async (request, reply) => {
     const { patient_id, followup_date, followup_type, content, result, next_followup_date, doctor, status, notes } = request.body;
 

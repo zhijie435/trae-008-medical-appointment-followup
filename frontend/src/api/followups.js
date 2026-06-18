@@ -52,3 +52,10 @@ export function deleteFollowup(id) {
     method: 'delete'
   });
 }
+
+export function getTodayPendingFollowups() {
+  return request({
+    url: '/followups/today/pending',
+    method: 'get'
+  });
+}

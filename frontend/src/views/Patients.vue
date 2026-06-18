@@ -193,38 +193,217 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="detailVisible" title="病例详情" width="720px" destroy-on-close>
-      <el-descriptions :column="2" border>
-        <el-descriptions-item label="姓名">{{ detailData.name }}</el-descriptions-item>
-        <el-descriptions-item label="性别">{{ detailData.gender }}</el-descriptions-item>
-        <el-descriptions-item label="年龄">{{ detailData.age }}岁</el-descriptions-item>
-        <el-descriptions-item label="电话">{{ detailData.phone }}</el-descriptions-item>
-        <el-descriptions-item label="身份证号" :span="2">{{ detailData.id_card }}</el-descriptions-item>
-        <el-descriptions-item label="诊断">{{ detailData.diagnosis }}</el-descriptions-item>
-        <el-descriptions-item label="科室">{{ detailData.department }}</el-descriptions-item>
-        <el-descriptions-item label="主治医生">{{ detailData.doctor }}</el-descriptions-item>
-        <el-descriptions-item label="状态">
-          <el-tag :type="getStatusType(detailData.status)">{{ getStatusText(detailData.status) }}</el-tag>
-        </el-descriptions-item>
-        <el-descriptions-item label="入院日期">{{ detailData.admission_date }}</el-descriptions-item>
-        <el-descriptions-item label="出院日期">{{ detailData.discharge_date || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="病例摘要" :span="2">
-          <div class="detail-notes">{{ detailData.notes || '暂无' }}</div>
-        </el-descriptions-item>
-        <el-descriptions-item label="创建时间" :span="2">{{ detailData.created_at }}</el-descriptions-item>
-      </el-descriptions>
+    <el-dialog v-model="detailVisible" title="病例详情" width="900px" destroy-on-close class="patient-detail-dialog">
+      <el-tabs v-model="activeTab" class="detail-tabs">
+        <el-tab-pane label="基本信息" name="basic">
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="姓名">{{ detailData.name }}</el-descriptions-item>
+            <el-descriptions-item label="性别">{{ detailData.gender }}</el-descriptions-item>
+            <el-descriptions-item label="年龄">{{ detailData.age }}岁</el-descriptions-item>
+            <el-descriptions-item label="电话">{{ detailData.phone }}</el-descriptions-item>
+            <el-descriptions-item label="身份证号" :span="2">{{ detailData.id_card }}</el-descriptions-item>
+            <el-descriptions-item label="诊断">{{ detailData.diagnosis }}</el-descriptions-item>
+            <el-descriptions-item label="科室">{{ detailData.department }}</el-descriptions-item>
+            <el-descriptions-item label="主治医生">{{ detailData.doctor }}</el-descriptions-item>
+            <el-descriptions-item label="状态">
+              <el-tag :type="getStatusType(detailData.status)">{{ getStatusText(detailData.status) }}</el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="入院日期">{{ detailData.admission_date }}</el-descriptions-item>
+            <el-descriptions-item label="出院日期">{{ detailData.discharge_date || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="创建时间" :span="2">{{ detailData.created_at }}</el-descriptions-item>
+          </el-descriptions>
+        </el-tab-pane>
+
+        <el-tab-pane label="病例摘要" name="summary">
+          <div class="summary-section">
+            <div class="summary-header">
+              <span class="section-title">病例摘要</span>
+              <el-button type="primary" link @click="showEditSummary = true">
+                <el-icon><Edit /></el-icon> 编辑摘要
+              </el-button>
+            </div>
+            <div class="summary-content">
+              <div v-if="detailData.notes" class="notes-text">{{ detailData.notes }}</div>
+              <el-empty v-else description="暂无病例摘要，点击上方编辑按钮录入" :image-size="80" />
+            </div>
+          </div>
+
+          <el-divider />
+
+          <div class="summary-section">
+            <div class="summary-header">
+              <span class="section-title">诊断信息</span>
+            </div>
+            <el-descriptions :column="2" border size="small">
+              <el-descriptions-item label="主要诊断">
+                <el-tag type="primary">{{ detailData.diagnosis || '未填写' }}</el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="就诊科室">{{ detailData.department || '未填写' }}</el-descriptions-item>
+              <el-descriptions-item label="主治医生">{{ detailData.doctor || '未填写' }}</el-descriptions-item>
+              <el-descriptions-item label="患者状态">
+                <el-tag :type="getStatusType(detailData.status)">{{ getStatusText(detailData.status) }}</el-tag>
+              </el-descriptions-item>
+            </el-descriptions>
+          </div>
+        </el-tab-pane>
+
+        <el-tab-pane label="随访历史" name="followups">
+          <div class="followup-timeline">
+            <div class="timeline-header">
+              <span class="section-title">随访记录时间线</span>
+              <el-button type="primary" size="small" @click="handleQuickAddFollowup">
+                <el-icon><Plus /></el-icon> 新增随访
+              </el-button>
+            </div>
+            <div v-if="patientFollowups.length === 0" class="empty-followups">
+              <el-empty description="暂无随访记录" :image-size="80" />
+            </div>
+            <el-timeline v-else>
+              <el-timeline-item
+                v-for="(item, index) in patientFollowups"
+                :key="item.id"
+                :timestamp="item.followup_date"
+                :type="getTimelineType(item.status)"
+                placement="top"
+              >
+                <el-card shadow="never" class="timeline-card">
+                  <div class="timeline-card-header">
+                    <div class="card-title">
+                      <el-tag size="small" :type="getFollowupTypeTag(item.followup_type)">
+                        {{ item.followup_type }}
+                      </el-tag>
+                      <el-tag size="small" :type="getStatusType(item.status)">
+                        {{ getStatusText(item.status) }}
+                      </el-tag>
+                      <span class="followup-doctor" v-if="item.doctor">{{ item.doctor }}</span>
+                    </div>
+                  </div>
+                  <div class="timeline-card-body">
+                    <div class="form-group" v-if="item.content">
+                      <span class="label">随访内容：</span>
+                      <span class="value">{{ item.content }}</span>
+                    </div>
+                    <div class="form-group" v-if="item.result">
+                      <span class="label">随访结果：</span>
+                      <span class="value">{{ item.result }}</span>
+                    </div>
+                    <div class="form-group" v-if="item.next_followup_date">
+                      <span class="label">下次随访：</span>
+                      <span class="value highlight">{{ item.next_followup_date }}</span>
+                    </div>
+                    <div class="form-group" v-if="item.notes">
+                      <span class="label">备注：</span>
+                      <span class="value">{{ item.notes }}</span>
+                    </div>
+                  </div>
+                  <div class="timeline-card-footer">
+                    <span class="create-time">创建于 {{ item.created_at }}</span>
+                    <div class="card-actions">
+                      <el-button type="primary" link size="small" @click="handleViewFollowup(item)">
+                        <el-icon><View /></el-icon> 详情
+                      </el-button>
+                      <el-button v-if="item.status === 'pending'" type="success" link size="small" @click="handleCompleteFollowup(item)">
+                        <el-icon><Check /></el-icon> 完成
+                      </el-button>
+                    </div>
+                  </div>
+                </el-card>
+              </el-timeline-item>
+            </el-timeline>
+          </div>
+        </el-tab-pane>
+      </el-tabs>
+
       <div style="margin-top: 20px; text-align: right">
         <el-button @click="detailVisible = false">关闭</el-button>
-        <el-button type="primary" @click="handleEditFromDetail">编辑</el-button>
+        <el-button type="primary" @click="handleEditFromDetail">编辑基本信息</el-button>
       </div>
+    </el-dialog>
+
+    <el-dialog v-model="showEditSummary" title="编辑病例摘要" width="640px" destroy-on-close>
+      <el-form :model="summaryForm" label-width="100px">
+        <el-form-item label="诊断">
+          <el-input v-model="summaryForm.diagnosis" placeholder="请输入诊断结果" />
+        </el-form-item>
+        <el-form-item label="科室">
+          <el-input v-model="summaryForm.department" placeholder="请输入科室" />
+        </el-form-item>
+        <el-form-item label="主治医生">
+          <el-input v-model="summaryForm.doctor" placeholder="请输入主治医生" />
+        </el-form-item>
+        <el-form-item label="病例摘要">
+          <el-input
+            v-model="summaryForm.notes"
+            type="textarea"
+            :rows="8"
+            placeholder="请输入病例摘要，包括：主诉、现病史、既往史、检查结果、治疗方案、注意事项等..."
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showEditSummary = false">取消</el-button>
+        <el-button type="primary" :loading="summaryLoading" @click="submitSummary">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="followupDetailVisible" title="随访详情" width="560px" destroy-on-close>
+      <el-descriptions :column="2" border>
+        <el-descriptions-item label="随访日期">{{ currentFollowup.followup_date }}</el-descriptions-item>
+        <el-descriptions-item label="随访类型">{{ currentFollowup.followup_type }}</el-descriptions-item>
+        <el-descriptions-item label="随访医生">{{ currentFollowup.doctor || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="状态">
+          <el-tag :type="getStatusType(currentFollowup.status)">{{ getStatusText(currentFollowup.status) }}</el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="随访内容" :span="2">
+          <div class="detail-text">{{ currentFollowup.content || '暂无' }}</div>
+        </el-descriptions-item>
+        <el-descriptions-item label="随访结果" :span="2">
+          <div class="detail-text">{{ currentFollowup.result || '暂无' }}</div>
+        </el-descriptions-item>
+        <el-descriptions-item label="下次随访" :span="2">{{ currentFollowup.next_followup_date || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="备注" :span="2">
+          <div class="detail-text">{{ currentFollowup.notes || '暂无' }}</div>
+        </el-descriptions-item>
+      </el-descriptions>
+      <div style="margin-top: 20px; text-align: right">
+        <el-button @click="followupDetailVisible = false">关闭</el-button>
+      </div>
+    </el-dialog>
+
+    <el-dialog v-model="completeFollowupVisible" title="完成随访" width="500px" destroy-on-close>
+      <el-form :model="completeFollowupForm" label-width="100px">
+        <el-form-item label="随访结果" required>
+          <el-input
+            v-model="completeFollowupForm.result"
+            type="textarea"
+            :rows="4"
+            placeholder="请输入随访结果"
+          />
+        </el-form-item>
+        <el-form-item label="下次随访">
+          <el-date-picker
+            v-model="completeFollowupForm.next_followup_date"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="选择日期"
+            style="width: 100%"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="completeFollowupVisible = false">取消</el-button>
+        <el-button type="primary" :loading="completeFollowupLoading" @click="submitCompleteFollowup">确定</el-button>
+      </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { getPatientList, createPatient, updatePatient, deletePatient } from '@/api/patients';
+import { getFollowupsByPatient, createFollowup, updateFollowupStatus } from '@/api/followups';
+import dayjs from 'dayjs';
 
 const loading = ref(false);
 const submitLoading = ref(false);
@@ -270,6 +449,26 @@ const detailVisible = ref(false);
 const detailData = ref({});
 const currentId = ref(null);
 
+const activeTab = ref('basic');
+const showEditSummary = ref(false);
+const summaryLoading = ref(false);
+const summaryForm = reactive({
+  diagnosis: '',
+  department: '',
+  doctor: '',
+  notes: ''
+});
+
+const patientFollowups = ref([]);
+const followupDetailVisible = ref(false);
+const currentFollowup = ref({});
+const completeFollowupVisible = ref(false);
+const completeFollowupLoading = ref(false);
+const completeFollowupForm = reactive({
+  result: '',
+  next_followup_date: ''
+});
+
 const getStatusType = (status) => {
   const map = {
     active: 'success',
@@ -286,6 +485,26 @@ const getStatusText = (status) => {
     inactive: '其他'
   };
   return map[status] || status;
+};
+
+const getTimelineType = (status) => {
+  const map = {
+    pending: 'warning',
+    completed: 'success',
+    cancelled: 'info'
+  };
+  return map[status] || 'primary';
+};
+
+const getFollowupTypeTag = (type) => {
+  const map = {
+    '电话随访': 'primary',
+    '门诊随访': 'success',
+    '上门随访': 'warning',
+    '微信随访': 'info',
+    '其他': 'info'
+  };
+  return map[type] || 'info';
 };
 
 const loadData = async () => {
@@ -305,6 +524,21 @@ const loadData = async () => {
     loading.value = false;
   }
 };
+
+const loadPatientFollowups = async (patientId) => {
+  try {
+    const res = await getFollowupsByPatient(patientId);
+    patientFollowups.value = res.data;
+  } catch (e) {
+    console.error(e);
+  }
+};
+
+watch(detailVisible, (val) => {
+  if (val && currentId.value) {
+    loadPatientFollowups(currentId.value);
+  }
+});
 
 const handleSearch = () => {
   pagination.page = 1;
@@ -351,6 +585,8 @@ const handleEdit = (row) => {
 
 const handleView = (row) => {
   detailData.value = row;
+  currentId.value = row.id;
+  activeTab.value = 'basic';
   detailVisible.value = true;
 };
 
@@ -358,6 +594,117 @@ const handleEditFromDetail = () => {
   detailVisible.value = false;
   handleEdit(detailData.value);
 };
+
+const handleQuickAddFollowup = () => {
+  detailVisible.value = false;
+  const newFollowup = {
+    patient_id: currentId.value,
+    followup_date: dayjs().format('YYYY-MM-DD'),
+    followup_type: '电话随访',
+    content: '',
+    result: '',
+    next_followup_date: '',
+    doctor: detailData.value.doctor || '',
+    status: 'pending',
+    notes: ''
+  };
+  ElMessageBox.confirm(`确定为患者"${detailData.value.name}"创建一条随访记录吗？`, '提示', {
+    confirmButtonText: '去创建',
+    cancelButtonText: '取消',
+    type: 'info'
+  }).then(async () => {
+    try {
+      await createFollowup(newFollowup);
+      ElMessage.success('随访记录创建成功，请在随访管理中完善内容');
+      loadPatientFollowups(currentId.value);
+      detailVisible.value = true;
+      activeTab.value = 'followups';
+    } catch (e) {
+      console.error(e);
+    }
+  }).catch(() => {
+    detailVisible.value = true;
+  });
+};
+
+const handleViewFollowup = (item) => {
+  currentFollowup.value = item;
+  followupDetailVisible.value = true;
+};
+
+const handleCompleteFollowup = (item) => {
+  currentFollowup.value = item;
+  completeFollowupForm.result = '';
+  completeFollowupForm.next_followup_date = '';
+  completeFollowupVisible.value = true;
+};
+
+const submitCompleteFollowup = async () => {
+  if (!completeFollowupForm.result) {
+    ElMessage.warning('请输入随访结果');
+    return;
+  }
+  completeFollowupLoading.value = true;
+  try {
+    await updateFollowupStatus(currentFollowup.value.id, {
+      status: 'completed',
+      result: completeFollowupForm.result
+    });
+    if (completeFollowupForm.next_followup_date) {
+      await createFollowup({
+        patient_id: currentFollowup.value.patient_id,
+        followup_date: completeFollowupForm.next_followup_date,
+        followup_type: currentFollowup.value.followup_type,
+        content: '',
+        result: '',
+        next_followup_date: '',
+        doctor: currentFollowup.value.doctor || '',
+        status: 'pending',
+        notes: ''
+      });
+    }
+    ElMessage.success('随访已完成');
+    completeFollowupVisible.value = false;
+    loadPatientFollowups(currentId.value);
+  } catch (e) {
+    console.error(e);
+  } finally {
+    completeFollowupLoading.value = false;
+  }
+};
+
+const submitSummary = async () => {
+  summaryLoading.value = true;
+  try {
+    await updatePatient(currentId.value, {
+      ...detailData.value,
+      diagnosis: summaryForm.diagnosis,
+      department: summaryForm.department,
+      doctor: summaryForm.doctor,
+      notes: summaryForm.notes
+    });
+    detailData.value.diagnosis = summaryForm.diagnosis;
+    detailData.value.department = summaryForm.department;
+    detailData.value.doctor = summaryForm.doctor;
+    detailData.value.notes = summaryForm.notes;
+    ElMessage.success('病例摘要保存成功');
+    showEditSummary.value = false;
+    loadData();
+  } catch (e) {
+    console.error(e);
+  } finally {
+    summaryLoading.value = false;
+  }
+};
+
+watch(showEditSummary, (val) => {
+  if (val && detailData.value) {
+    summaryForm.diagnosis = detailData.value.diagnosis || '';
+    summaryForm.department = detailData.value.department || '';
+    summaryForm.doctor = detailData.value.doctor || '';
+    summaryForm.notes = detailData.value.notes || '';
+  }
+});
 
 const handleSubmit = async () => {
   if (!formRef.value) return;
@@ -436,5 +783,136 @@ onMounted(() => {
 .detail-notes {
   line-height: 1.6;
   white-space: pre-wrap;
+}
+
+.detail-tabs {
+  margin-top: 10px;
+}
+
+.summary-section {
+  margin-bottom: 16px;
+}
+
+.summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.summary-content {
+  background-color: #fafafa;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #ebeef5;
+}
+
+.notes-text {
+  line-height: 1.8;
+  color: #606266;
+  white-space: pre-wrap;
+  font-size: 14px;
+}
+
+.timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.empty-followups {
+  padding: 40px 0;
+}
+
+.timeline-card {
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+}
+
+.timeline-card :deep(.el-card__body) {
+  padding: 16px;
+}
+
+.timeline-card-header {
+  margin-bottom: 12px;
+}
+
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.followup-doctor {
+  color: #909399;
+  font-size: 13px;
+  margin-left: 8px;
+}
+
+.timeline-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.form-group .label {
+  color: #909399;
+  flex-shrink: 0;
+  min-width: 80px;
+}
+
+.form-group .value {
+  color: #303133;
+  flex: 1;
+}
+
+.form-group .value.highlight {
+  color: #e6a23c;
+  font-weight: 500;
+}
+
+.timeline-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.create-time {
+  color: #c0c4cc;
+  font-size: 12px;
+}
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.detail-text {
+  line-height: 1.6;
+  white-space: pre-wrap;
+  min-height: 40px;
+  color: #606266;
+}
+
+.patient-detail-dialog :deep(.el-dialog__body) {
+  padding: 10px 20px 20px;
 }
 </style>
