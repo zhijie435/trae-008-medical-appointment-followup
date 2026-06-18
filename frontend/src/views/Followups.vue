@@ -158,7 +158,7 @@
           <el-col :span="12">
             <el-form-item label="科室">
               <el-select
-                v-model="formData.department"
+                v-model="formData.patient_department"
                 placeholder="请选择或输入科室"
                 filterable
                 allow-create
@@ -340,7 +340,7 @@ const formData = reactive({
   content: '',
   result: '',
   next_followup_date: '',
-  department: '',
+  patient_department: '',
   doctor: '',
   status: 'pending',
   notes: ''
@@ -427,7 +427,7 @@ const loadDoctors = async () => {
 const handlePatientChange = (patientId) => {
   const patient = patientList.value.find(p => p.id === patientId);
   if (patient) {
-    formData.department = patient.department || '';
+    formData.patient_department = patient.department || '';
     formData.doctor = patient.doctor || '';
   }
 };
@@ -452,7 +452,7 @@ const resetForm = () => {
   formData.content = '';
   formData.result = '';
   formData.next_followup_date = '';
-  formData.department = '';
+  formData.patient_department = '';
   formData.doctor = '';
   formData.status = 'pending';
   formData.notes = '';
@@ -520,11 +520,12 @@ const handleSubmit = async () => {
     if (valid) {
       submitLoading.value = true;
       try {
+        const { patient_department, ...submitData } = formData;
         if (dialogType.value === 'add') {
-          await createFollowup(formData);
+          await createFollowup(submitData);
           ElMessage.success('新增成功');
         } else {
-          await updateFollowup(currentId.value, formData);
+          await updateFollowup(currentId.value, submitData);
           ElMessage.success('更新成功');
         }
         dialogVisible.value = false;

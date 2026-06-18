@@ -881,9 +881,6 @@ onMounted(() => {
   border-radius: 8px;
   padding: 16px;
   border: 1px solid #ebeef5;
-  max-height: 400px;
-  overflow-y: auto;
-  overflow-x: hidden;
   word-break: break-word;
   overflow-wrap: break-word;
 }
