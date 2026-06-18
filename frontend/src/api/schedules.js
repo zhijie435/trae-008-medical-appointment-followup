@@ -52,3 +52,26 @@ export function deleteSchedule(id) {
     method: 'delete'
   });
 }
+
+export function getScheduleDepartments() {
+  return request({
+    url: '/schedules/departments',
+    method: 'get'
+  });
+}
+
+export function getScheduleDoctors(department) {
+  return request({
+    url: '/schedules/doctors',
+    method: 'get',
+    params: department ? { department } : {}
+  });
+}
+
+export function checkScheduleConflict(data) {
+  return request({
+    url: '/schedules/check-conflict',
+    method: 'post',
+    data
+  });
+}

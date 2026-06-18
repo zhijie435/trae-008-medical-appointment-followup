@@ -2,7 +2,7 @@ async function patientRoutes(fastify, options) {
   const db = fastify.db;
 
   fastify.get('/', async (request, reply) => {
-    const { page = 1, pageSize = 10, keyword = '', status = '' } = request.query;
+    const { page = 1, pageSize = 10, keyword = '', status = '', department = '' } = request.query;
     const offset = (page - 1) * pageSize;
 
     let whereClause = 'WHERE 1=1';
@@ -16,6 +16,11 @@ async function patientRoutes(fastify, options) {
     if (status) {
       whereClause += ' AND status = ?';
       params.push(status);
+    }
+
+    if (department) {
+      whereClause += ' AND department = ?';
+      params.push(department);
     }
 
     const total = db.prepare(`SELECT COUNT(*) as count FROM patients ${whereClause}`).get(...params);
@@ -35,6 +40,16 @@ async function patientRoutes(fastify, options) {
         pageSize: parseInt(pageSize)
       }
     };
+  });
+
+  fastify.get('/departments', async (request, reply) => {
+    const rows = db.prepare(`
+      SELECT DISTINCT department FROM patients 
+      WHERE department IS NOT NULL AND department != ''
+      ORDER BY department
+    `).all();
+    const departments = rows.map(r => r.department);
+    return { code: 0, data: departments };
   });
 
   fastify.get('/all', async (request, reply) => {

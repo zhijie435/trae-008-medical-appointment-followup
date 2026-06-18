@@ -44,3 +44,10 @@ export function deletePatient(id) {
     method: 'delete'
   });
 }
+
+export function getPatientDepartments() {
+  return request({
+    url: '/patients/departments',
+    method: 'get'
+  });
+}

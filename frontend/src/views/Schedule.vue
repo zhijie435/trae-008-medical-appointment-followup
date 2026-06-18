@@ -99,6 +99,16 @@
             <el-option label="其他" value="other" />
           </el-select>
         </el-form-item>
+        <el-form-item label="科室">
+          <el-select v-model="searchForm.department" placeholder="全部科室" clearable filterable style="width: 140px">
+            <el-option
+              v-for="d in departmentList"
+              :key="d"
+              :label="d"
+              :value="d"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="searchForm.status" placeholder="全部" clearable style="width: 120px">
             <el-option label="已排" value="scheduled" />
@@ -234,16 +244,65 @@
         </el-form-item>
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="医生">
-              <el-input v-model="formData.doctor" placeholder="请输入医生" />
+            <el-form-item label="科室">
+              <el-select
+                v-model="formData.department"
+                placeholder="请选择或输入科室"
+                filterable
+                allow-create
+                default-first-option
+                clearable
+                style="width: 100%"
+                @change="handleDepartmentChange"
+              >
+                <el-option
+                  v-for="d in departmentList"
+                  :key="d"
+                  :label="d"
+                  :value="d"
+                />
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="科室">
-              <el-input v-model="formData.department" placeholder="请输入科室" />
+            <el-form-item label="医生">
+              <el-select
+                v-model="formData.doctor"
+                placeholder="请选择或输入医生"
+                filterable
+                allow-create
+                default-first-option
+                clearable
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="doc in doctorList"
+                  :key="doc"
+                  :label="doc"
+                  :value="doc"
+                />
+              </el-select>
             </el-form-item>
           </el-col>
         </el-row>
+        <el-alert
+          v-if="conflictWarn.length > 0"
+          :title="`检测到 ${conflictWarn.length} 个潜在冲突`"
+          type="warning"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 18px"
+        >
+          <div slot="default">
+            <div
+              v-for="(c, idx) in conflictWarn"
+              :key="idx"
+              style="font-size: 13px; line-height: 1.8"
+            >
+              ・{{ c.message }}
+            </div>
+          </div>
+        </el-alert>
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="诊室">
@@ -308,7 +367,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import dayjs from 'dayjs';
 import {
@@ -316,7 +375,10 @@ import {
   getMonthSchedule,
   createSchedule,
   updateSchedule,
-  deleteSchedule
+  deleteSchedule,
+  getScheduleDepartments,
+  getScheduleDoctors,
+  checkScheduleConflict
 } from '@/api/schedules';
 import { getAllPatients } from '@/api/patients';
 
@@ -327,13 +389,18 @@ const currentDate = ref(dayjs());
 const scheduleList = ref([]);
 const listData = ref([]);
 const patientList = ref([]);
+const departmentList = ref([]);
+const doctorList = ref([]);
+const conflictWarn = ref([]);
+let conflictTimer = null;
 
 const weekDays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 
 const searchForm = reactive({
   keyword: '',
   type: '',
-  status: ''
+  status: '',
+  department: ''
 });
 
 const currentMonthTitle = computed(() => {
@@ -461,7 +528,8 @@ const loadList = async () => {
     const res = await getScheduleList({
       keyword: searchForm.keyword,
       type: searchForm.type,
-      status: searchForm.status
+      status: searchForm.status,
+      department: searchForm.department
     });
     listData.value = res.data;
   } catch (e) {
@@ -479,6 +547,57 @@ const loadPatients = async () => {
     console.error(e);
   }
 };
+
+const loadDepartments = async () => {
+  try {
+    const res = await getScheduleDepartments();
+    departmentList.value = res.data || [];
+  } catch (e) {
+    console.error(e);
+  }
+};
+
+const loadDoctors = async (department = '') => {
+  try {
+    const res = await getScheduleDoctors(department);
+    doctorList.value = res.data || [];
+  } catch (e) {
+    console.error(e);
+  }
+};
+
+const runConflictCheck = async () => {
+  if (!formData.date || !formData.start_time) {
+    conflictWarn.value = [];
+    return;
+  }
+  try {
+    const res = await checkScheduleConflict({
+      date: formData.date,
+      start_time: formData.start_time,
+      end_time: formData.end_time,
+      doctor: formData.doctor,
+      room: formData.room,
+      patient_id: formData.patient_id,
+      exclude_id: dialogType.value === 'edit' ? currentId.value : null
+    });
+    conflictWarn.value = res.data?.conflicts || [];
+  } catch (e) {
+    conflictWarn.value = [];
+  }
+};
+
+const scheduleConflictCheck = () => {
+  if (conflictTimer) clearTimeout(conflictTimer);
+  conflictTimer = setTimeout(runConflictCheck, 300);
+};
+
+watch(
+  () => [formData.date, formData.start_time, formData.end_time, formData.doctor, formData.room, formData.patient_id],
+  () => {
+    if (dialogVisible.value) scheduleConflictCheck();
+  }
+);
 
 const prevMonth = () => {
   currentDate.value = currentDate.value.subtract(1, 'month');
@@ -504,6 +623,7 @@ const handleReset = () => {
   searchForm.keyword = '';
   searchForm.type = '';
   searchForm.status = '';
+  searchForm.department = '';
   loadList();
 };
 
@@ -523,21 +643,28 @@ const resetForm = () => {
   formRef.value?.clearValidate();
 };
 
-const handleAdd = () => {
+const handleAdd = async () => {
   dialogType.value = 'add';
   dialogTitle.value = '新增排班';
+  conflictWarn.value = [];
   if (!formData.date) {
     formData.date = dayjs().format('YYYY-MM-DD');
   }
+  if (departmentList.value.length === 0) await loadDepartments();
+  if (doctorList.value.length === 0) await loadDoctors();
   dialogVisible.value = true;
 };
 
-const handleEdit = (row) => {
+const handleEdit = async (row) => {
   dialogType.value = 'edit';
   dialogTitle.value = '编辑排班';
+  conflictWarn.value = [];
   currentId.value = row.id;
   Object.assign(formData, row);
+  if (departmentList.value.length === 0) await loadDepartments();
+  await loadDoctors();
   dialogVisible.value = true;
+  scheduleConflictCheck();
 };
 
 const handleView = (row) => {
@@ -564,6 +691,20 @@ const handlePatientChange = (patientId) => {
     if (!formData.title) {
       formData.title = `${patient.name}-随访`;
     }
+    if (!formData.department && patient.department) {
+      formData.department = patient.department;
+      loadDoctors(patient.department);
+    }
+    if (!formData.doctor && patient.doctor) {
+      formData.doctor = patient.doctor;
+    }
+  }
+};
+
+const handleDepartmentChange = (department) => {
+  loadDoctors(department || '');
+  if (formData.doctor && doctorList.value.length > 0 && !doctorList.value.includes(formData.doctor)) {
+    formData.doctor = '';
   }
 };
 
@@ -587,7 +728,20 @@ const handleSubmit = async () => {
           loadList();
         }
       } catch (e) {
-        console.error(e);
+        const resp = e?.response?.data || e?.data || {};
+        if (resp.code === -1 && resp.data?.conflicts?.length) {
+          conflictWarn.value = resp.data.conflicts;
+          const msgs = resp.data.conflicts.map(c => `・${c.message}`).join('\n');
+          ElMessage.error({
+            message: `${resp.message}\n${msgs}`,
+            duration: 5000,
+            showClose: true
+          });
+        } else if (resp.message) {
+          ElMessage.error(resp.message);
+        } else {
+          ElMessage.error(dialogType.value === 'add' ? '新增失败' : '更新失败');
+        }
       } finally {
         submitLoading.value = false;
       }
@@ -619,6 +773,8 @@ onMounted(() => {
   loadMonthData();
   loadList();
   loadPatients();
+  loadDepartments();
+  loadDoctors();
 });
 </script>
 

@@ -11,6 +11,16 @@
             @keyup.enter="handleSearch"
           />
         </el-form-item>
+        <el-form-item label="科室">
+          <el-select v-model="searchForm.department" placeholder="全部科室" clearable filterable style="width: 140px">
+            <el-option
+              v-for="d in departmentList"
+              :key="d"
+              :label="d"
+              :value="d"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="searchForm.status" placeholder="全部" clearable style="width: 120px">
             <el-option label="活跃" value="active" />
@@ -136,12 +146,42 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="科室" prop="department">
-              <el-input v-model="formData.department" placeholder="请输入科室" />
+              <el-select
+                v-model="formData.department"
+                placeholder="请选择或输入科室"
+                filterable
+                allow-create
+                default-first-option
+                clearable
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="d in departmentList"
+                  :key="d"
+                  :label="d"
+                  :value="d"
+                />
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="主治医生" prop="doctor">
-              <el-input v-model="formData.doctor" placeholder="请输入主治医生" />
+              <el-select
+                v-model="formData.doctor"
+                placeholder="请选择或输入医生"
+                filterable
+                allow-create
+                default-first-option
+                clearable
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="doc in doctorList"
+                  :key="doc"
+                  :label="doc"
+                  :value="doc"
+                />
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -401,17 +441,21 @@
 <script setup>
 import { ref, reactive, onMounted, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { getPatientList, createPatient, updatePatient, deletePatient } from '@/api/patients';
+import { getPatientList, createPatient, updatePatient, deletePatient, getPatientDepartments } from '@/api/patients';
 import { getFollowupsByPatient, createFollowup, updateFollowupStatus } from '@/api/followups';
+import { getScheduleDoctors } from '@/api/schedules';
 import dayjs from 'dayjs';
 
 const loading = ref(false);
 const submitLoading = ref(false);
 const tableData = ref([]);
+const departmentList = ref([]);
+const doctorList = ref([]);
 
 const searchForm = reactive({
   keyword: '',
-  status: ''
+  status: '',
+  department: ''
 });
 
 const pagination = reactive({
@@ -514,7 +558,8 @@ const loadData = async () => {
       page: pagination.page,
       pageSize: pagination.pageSize,
       keyword: searchForm.keyword,
-      status: searchForm.status
+      status: searchForm.status,
+      department: searchForm.department
     });
     tableData.value = res.data.list;
     pagination.total = res.data.total;
@@ -534,6 +579,24 @@ const loadPatientFollowups = async (patientId) => {
   }
 };
 
+const loadDepartments = async () => {
+  try {
+    const res = await getPatientDepartments();
+    departmentList.value = res.data || [];
+  } catch (e) {
+    console.error(e);
+  }
+};
+
+const loadDoctors = async () => {
+  try {
+    const res = await getScheduleDoctors();
+    doctorList.value = res.data || [];
+  } catch (e) {
+    console.error(e);
+  }
+};
+
 watch(detailVisible, (val) => {
   if (val && currentId.value) {
     loadPatientFollowups(currentId.value);
@@ -548,6 +611,7 @@ const handleSearch = () => {
 const handleReset = () => {
   searchForm.keyword = '';
   searchForm.status = '';
+  searchForm.department = '';
   pagination.page = 1;
   loadData();
 };
@@ -568,18 +632,22 @@ const resetForm = () => {
   formRef.value?.clearValidate();
 };
 
-const handleAdd = () => {
+const handleAdd = async () => {
   dialogType.value = 'add';
   dialogTitle.value = '新增病例';
   resetForm();
+  if (departmentList.value.length === 0) await loadDepartments();
+  if (doctorList.value.length === 0) await loadDoctors();
   dialogVisible.value = true;
 };
 
-const handleEdit = (row) => {
+const handleEdit = async (row) => {
   dialogType.value = 'edit';
   dialogTitle.value = '编辑病例';
   currentId.value = row.id;
   Object.assign(formData, row);
+  if (departmentList.value.length === 0) await loadDepartments();
+  if (doctorList.value.length === 0) await loadDoctors();
   dialogVisible.value = true;
 };
 
@@ -748,6 +816,8 @@ const handleDelete = (row) => {
 
 onMounted(() => {
   loadData();
+  loadDepartments();
+  loadDoctors();
 });
 </script>
 

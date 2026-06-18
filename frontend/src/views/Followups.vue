@@ -11,6 +11,16 @@
             @keyup.enter="handleSearch"
           />
         </el-form-item>
+        <el-form-item label="科室">
+          <el-select v-model="searchForm.department" placeholder="全部科室" clearable filterable style="width: 140px">
+            <el-option
+              v-for="d in departmentList"
+              :key="d"
+              :label="d"
+              :value="d"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="searchForm.status" placeholder="全部" clearable style="width: 120px">
             <el-option label="待随访" value="pending" />
@@ -46,6 +56,7 @@
         <el-table-column prop="content" label="随访内容" show-overflow-tooltip min-width="180" />
         <el-table-column prop="result" label="随访结果" show-overflow-tooltip min-width="150" />
         <el-table-column prop="next_followup_date" label="下次随访" width="120" />
+        <el-table-column prop="patient_department" label="所属科室" width="100" />
         <el-table-column prop="doctor" label="随访医生" width="100" />
         <el-table-column prop="status" label="状态" width="90" align="center">
           <template #default="{ row }">
@@ -256,16 +267,18 @@ import {
   deleteFollowup,
   updateFollowupStatus
 } from '@/api/followups';
-import { getAllPatients } from '@/api/patients';
+import { getAllPatients, getPatientDepartments } from '@/api/patients';
 
 const loading = ref(false);
 const submitLoading = ref(false);
 const tableData = ref([]);
 const patientList = ref([]);
+const departmentList = ref([]);
 
 const searchForm = reactive({
   keyword: '',
-  status: ''
+  status: '',
+  department: ''
 });
 
 const pagination = reactive({
@@ -331,7 +344,8 @@ const loadData = async () => {
       page: pagination.page,
       pageSize: pagination.pageSize,
       keyword: searchForm.keyword,
-      status: searchForm.status
+      status: searchForm.status,
+      department: searchForm.department
     });
     tableData.value = res.data.list;
     pagination.total = res.data.total;
@@ -351,6 +365,15 @@ const loadPatients = async () => {
   }
 };
 
+const loadDepartments = async () => {
+  try {
+    const res = await getPatientDepartments();
+    departmentList.value = res.data || [];
+  } catch (e) {
+    console.error(e);
+  }
+};
+
 const handleSearch = () => {
   pagination.page = 1;
   loadData();
@@ -359,6 +382,7 @@ const handleSearch = () => {
 const handleReset = () => {
   searchForm.keyword = '';
   searchForm.status = '';
+  searchForm.department = '';
   pagination.page = 1;
   loadData();
 };
@@ -474,6 +498,7 @@ const handleDelete = (row) => {
 onMounted(() => {
   loadData();
   loadPatients();
+  loadDepartments();
 });
 </script>
 

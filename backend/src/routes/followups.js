@@ -2,7 +2,7 @@ async function followupRoutes(fastify, options) {
   const db = fastify.db;
 
   fastify.get('/', async (request, reply) => {
-    const { page = 1, pageSize = 10, patient_id = '', status = '', keyword = '' } = request.query;
+    const { page = 1, pageSize = 10, patient_id = '', status = '', keyword = '', department = '', doctor = '' } = request.query;
     const offset = (page - 1) * pageSize;
 
     let whereClause = 'WHERE 1=1';
@@ -18,6 +18,16 @@ async function followupRoutes(fastify, options) {
       params.push(status);
     }
 
+    if (department) {
+      whereClause += ' AND p.department = ?';
+      params.push(department);
+    }
+
+    if (doctor) {
+      whereClause += ' AND (f.doctor = ? OR p.doctor = ?)';
+      params.push(doctor, doctor);
+    }
+
     if (keyword) {
       whereClause += ' AND (p.name LIKE ? OR f.content LIKE ?)';
       params.push(`%${keyword}%`, `%${keyword}%`);
@@ -30,7 +40,7 @@ async function followupRoutes(fastify, options) {
     `).get(...params);
 
     const followups = db.prepare(`
-      SELECT f.*, p.name as patient_name, p.gender, p.age, p.diagnosis
+      SELECT f.*, p.name as patient_name, p.gender, p.age, p.diagnosis, p.department as patient_department
       FROM followups f
       LEFT JOIN patients p ON f.patient_id = p.id
       ${whereClause}
