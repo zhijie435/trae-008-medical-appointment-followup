@@ -38,7 +38,7 @@ async function patientRoutes(fastify, options) {
   });
 
   fastify.get('/all', async (request, reply) => {
-    const patients = db.prepare('SELECT id, name, gender, age, phone, diagnosis FROM patients WHERE status = "active" ORDER BY name').all();
+    const patients = db.prepare("SELECT id, name, gender, age, phone, diagnosis FROM patients WHERE status = 'active' ORDER BY name").all();
     return {
       code: 0,
       data: patients
