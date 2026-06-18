@@ -120,6 +120,7 @@
             placeholder="请选择患者"
             filterable
             style="width: 100%"
+            @change="handlePatientChange"
           >
             <el-option
               v-for="p in patientList"
@@ -153,6 +154,48 @@
             </el-form-item>
           </el-col>
         </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="科室">
+              <el-select
+                v-model="formData.department"
+                placeholder="请选择或输入科室"
+                filterable
+                allow-create
+                default-first-option
+                clearable
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="d in departmentList"
+                  :key="d"
+                  :label="d"
+                  :value="d"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="随访医生" prop="doctor">
+              <el-select
+                v-model="formData.doctor"
+                placeholder="请选择或输入医生"
+                filterable
+                allow-create
+                default-first-option
+                clearable
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="doc in doctorList"
+                  :key="doc"
+                  :label="doc"
+                  :value="doc"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
         <el-form-item label="随访内容" prop="content">
           <el-input
             v-model="formData.content"
@@ -170,7 +213,7 @@
           />
         </el-form-item>
         <el-row :gutter="20">
-          <el-col :span="12">
+          <el-col :span="24">
             <el-form-item label="下次随访" prop="next_followup_date">
               <el-date-picker
                 v-model="formData.next_followup_date"
@@ -179,11 +222,6 @@
                 placeholder="选择日期"
                 style="width: 100%"
               />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="随访医生" prop="doctor">
-              <el-input v-model="formData.doctor" placeholder="请输入随访医生" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -268,12 +306,14 @@ import {
   updateFollowupStatus
 } from '@/api/followups';
 import { getAllPatients, getPatientDepartments } from '@/api/patients';
+import { getScheduleDoctors } from '@/api/schedules';
 
 const loading = ref(false);
 const submitLoading = ref(false);
 const tableData = ref([]);
 const patientList = ref([]);
 const departmentList = ref([]);
+const doctorList = ref([]);
 
 const searchForm = reactive({
   keyword: '',
@@ -300,6 +340,7 @@ const formData = reactive({
   content: '',
   result: '',
   next_followup_date: '',
+  department: '',
   doctor: '',
   status: 'pending',
   notes: ''

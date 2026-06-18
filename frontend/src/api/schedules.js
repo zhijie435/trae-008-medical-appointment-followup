@@ -8,10 +8,11 @@ export function getScheduleList(params) {
   });
 }
 
-export function getMonthSchedule(year, month) {
+export function getMonthSchedule(year, month, params) {
   return request({
     url: `/schedules/month/${year}/${month}`,
-    method: 'get'
+    method: 'get',
+    params
   });
 }
 

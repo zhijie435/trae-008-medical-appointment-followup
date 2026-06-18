@@ -159,16 +159,33 @@ async function scheduleRoutes(fastify, options) {
 
   fastify.get('/month/:year/:month', async (request, reply) => {
     const { year, month } = request.params;
+    const { department = '', type = '', status = '' } = request.query;
     const startDate = `${year}-${month.padStart(2, '0')}-01`;
     const nextMonth = month == 12 ? 1 : parseInt(month) + 1;
     const nextYear = month == 12 ? parseInt(year) + 1 : year;
     const endDate = `${nextYear}-${nextMonth.toString().padStart(2, '0')}-01`;
 
+    let whereClause = 'WHERE date >= ? AND date < ?';
+    const params = [startDate, endDate];
+
+    if (department) {
+      whereClause += ' AND department = ?';
+      params.push(department);
+    }
+    if (type) {
+      whereClause += ' AND type = ?';
+      params.push(type);
+    }
+    if (status) {
+      whereClause += ' AND status = ?';
+      params.push(status);
+    }
+
     const schedules = db.prepare(`
       SELECT * FROM schedules
-      WHERE date >= ? AND date < ?
+      ${whereClause}
       ORDER BY date ASC, start_time ASC
-    `).all(startDate, endDate);
+    `).all(...params);
 
     return { code: 0, data: schedules };
   });

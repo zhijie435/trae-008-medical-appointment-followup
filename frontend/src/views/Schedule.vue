@@ -33,6 +33,56 @@
       </div>
     </el-card>
 
+    <el-card v-if="viewMode === 'calendar'" class="calendar-filter-card" shadow="never">
+      <el-form :inline="true" :model="searchForm" class="search-form calendar-filter">
+        <el-form-item label="关键词">
+          <el-input
+            v-model="searchForm.keyword"
+            placeholder="标题/患者/医生"
+            clearable
+            style="width: 180px"
+            @keyup.enter="loadMonthData"
+          />
+        </el-form-item>
+        <el-form-item label="类型">
+          <el-select v-model="searchForm.type" placeholder="全部" clearable style="width: 120px" @change="loadMonthData">
+            <el-option label="随访" value="followup" />
+            <el-option label="门诊" value="clinic" />
+            <el-option label="会议" value="meeting" />
+            <el-option label="其他" value="other" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="科室">
+          <el-select v-model="searchForm.department" placeholder="全部科室" clearable filterable style="width: 140px" @change="loadMonthData">
+            <el-option
+              v-for="d in departmentList"
+              :key="d"
+              :label="d"
+              :value="d"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="searchForm.status" placeholder="全部" clearable style="width: 120px" @change="loadMonthData">
+            <el-option label="已排" value="scheduled" />
+            <el-option label="进行中" value="ongoing" />
+            <el-option label="已完成" value="completed" />
+            <el-option label="已取消" value="cancelled" />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="loadMonthData">
+            <el-icon><Search /></el-icon>
+            筛选
+          </el-button>
+          <el-button @click="handleCalendarReset">
+            <el-icon><Refresh /></el-icon>
+            重置
+          </el-button>
+        </el-form-item>
+      </el-form>
+    </el-card>
+
     <el-card v-if="viewMode === 'calendar'" class="calendar-card" shadow="never">
       <div class="calendar-container">
         <div class="calendar-header">
@@ -413,6 +463,8 @@ const calendarDays = computed(() => {
   const firstDay = dayjs(new Date(year, month, 1));
   const startDay = firstDay.subtract(firstDay.day(), 'day');
   
+  const keyword = searchForm.keyword?.trim().toLowerCase();
+  
   const weeks = [];
   let current = startDay;
   
@@ -421,7 +473,15 @@ const calendarDays = computed(() => {
     for (let j = 0; j < 7; j++) {
       const dayDate = current;
       const dateStr = dayDate.format('YYYY-MM-DD');
-      const events = scheduleList.value.filter(s => s.date === dateStr);
+      let events = scheduleList.value.filter(s => s.date === dateStr);
+      
+      if (keyword) {
+        events = events.filter(s => 
+          (s.title && s.title.toLowerCase().includes(keyword)) ||
+          (s.patient_name && s.patient_name.toLowerCase().includes(keyword)) ||
+          (s.doctor && s.doctor.toLowerCase().includes(keyword))
+        );
+      }
       
       week.push({
         day: dayDate.date(),
@@ -513,13 +573,25 @@ const loadMonthData = async () => {
   try {
     const year = currentDate.value.year();
     const month = currentDate.value.month() + 1;
-    const res = await getMonthSchedule(year, month);
+    const res = await getMonthSchedule(year, month, {
+      department: searchForm.department,
+      type: searchForm.type,
+      status: searchForm.status
+    });
     scheduleList.value = res.data;
   } catch (e) {
     console.error(e);
   } finally {
     loading.value = false;
   }
+};
+
+const handleCalendarReset = () => {
+  searchForm.keyword = '';
+  searchForm.type = '';
+  searchForm.status = '';
+  searchForm.department = '';
+  loadMonthData();
 };
 
 const loadList = async () => {
