@@ -296,35 +296,31 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
+import { storeToRefs } from 'pinia';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import {
-  getFollowupList,
-  createFollowup,
-  updateFollowup,
-  deleteFollowup,
-  updateFollowupStatus
-} from '@/api/followups';
-import { getAllPatients, getPatientDepartments } from '@/api/patients';
-import { getScheduleDoctors } from '@/api/schedules';
+import { useFollowupStore } from '@/stores/followup.js';
+import { usePatientStore } from '@/stores/patient.js';
+import { useScheduleStore } from '@/stores/schedule.js';
+import { getFollowupStatusType, getFollowupStatusText } from '@/utils/helpers.js';
 
-const loading = ref(false);
+const followupStore = useFollowupStore();
+const patientStore = usePatientStore();
+const scheduleStore = useScheduleStore();
+
+const { loading } = storeToRefs(followupStore);
+const tableData = computed(() => followupStore.list);
+const pagination = followupStore.pagination;
+const patientList = computed(() => patientStore.allPatients);
+const departmentList = computed(() => patientStore.departments);
+const doctorList = computed(() => scheduleStore.doctors);
+
 const submitLoading = ref(false);
-const tableData = ref([]);
-const patientList = ref([]);
-const departmentList = ref([]);
-const doctorList = ref([]);
 
 const searchForm = reactive({
   keyword: '',
   status: '',
   department: ''
-});
-
-const pagination = reactive({
-  page: 1,
-  pageSize: 10,
-  total: 0
 });
 
 const dialogVisible = ref(false);
@@ -360,68 +356,27 @@ const completeForm = reactive({
 });
 const completeId = ref(null);
 
-const getStatusType = (status) => {
-  const map = {
-    pending: 'warning',
-    completed: 'success',
-    cancelled: 'info'
-  };
-  return map[status] || 'info';
-};
-
-const getStatusText = (status) => {
-  const map = {
-    pending: '待随访',
-    completed: '已完成',
-    cancelled: '已取消'
-  };
-  return map[status] || status;
-};
+const getStatusType = (status) => getFollowupStatusType(status);
+const getStatusText = (status) => getFollowupStatusText(status);
 
 const loadData = async () => {
-  loading.value = true;
-  try {
-    const res = await getFollowupList({
-      page: pagination.page,
-      pageSize: pagination.pageSize,
-      keyword: searchForm.keyword,
-      status: searchForm.status,
-      department: searchForm.department
-    });
-    tableData.value = res.data.list;
-    pagination.total = res.data.total;
-  } catch (e) {
-    console.error(e);
-  } finally {
-    loading.value = false;
-  }
+  await followupStore.fetchList({
+    keyword: searchForm.keyword,
+    status: searchForm.status,
+    department: searchForm.department
+  });
 };
 
 const loadPatients = async () => {
-  try {
-    const res = await getAllPatients();
-    patientList.value = res.data;
-  } catch (e) {
-    console.error(e);
-  }
+  await patientStore.fetchAll();
 };
 
 const loadDepartments = async () => {
-  try {
-    const res = await getPatientDepartments();
-    departmentList.value = res.data || [];
-  } catch (e) {
-    console.error(e);
-  }
+  await patientStore.fetchDepartments();
 };
 
 const loadDoctors = async () => {
-  try {
-    const res = await getScheduleDoctors();
-    doctorList.value = res.data || [];
-  } catch (e) {
-    console.error(e);
-  }
+  await scheduleStore.fetchDoctors();
 };
 
 const handlePatientChange = (patientId) => {
@@ -500,10 +455,11 @@ const handleCompleteFromDetail = () => {
 const submitComplete = async () => {
   submitLoading.value = true;
   try {
-    await updateFollowupStatus(completeId.value, {
+    await followupStore.updateStatus(completeId.value, {
       status: 'completed',
       result: completeForm.result
     });
+    followupStore.clearCache();
     ElMessage.success('随访已完成');
     completeDialogVisible.value = false;
     loadData();
@@ -522,10 +478,12 @@ const handleSubmit = async () => {
       try {
         const { patient_department, ...submitData } = formData;
         if (dialogType.value === 'add') {
-          await createFollowup(submitData);
+          await followupStore.create(submitData);
+          followupStore.clearCache();
           ElMessage.success('新增成功');
         } else {
-          await updateFollowup(currentId.value, submitData);
+          await followupStore.update(currentId.value, submitData);
+          followupStore.clearCache();
           ElMessage.success('更新成功');
         }
         dialogVisible.value = false;
@@ -546,7 +504,8 @@ const handleDelete = (row) => {
     type: 'warning'
   }).then(async () => {
     try {
-      await deleteFollowup(row.id);
+      await followupStore.remove(row.id);
+      followupStore.clearCache();
       ElMessage.success('删除成功');
       loadData();
     } catch (e) {

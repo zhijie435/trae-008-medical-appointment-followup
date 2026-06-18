@@ -210,24 +210,24 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { getPatientList } from '@/api/patients';
-import { getFollowupList, getTodayPendingFollowups, updateFollowupStatus } from '@/api/followups';
-import { getScheduleList } from '@/api/schedules';
-import dayjs from 'dayjs';
+import { useDashboardStore } from '@/stores/dashboard';
+import { useFollowupStore } from '@/stores/followup';
+import {
+  getFollowupStatusType as getStatusType,
+  getFollowupStatusText as getStatusText,
+  getFollowupTypeTag,
+  getScheduleTypeText
+} from '@/utils/helpers';
 
-const stats = ref({
-  patientCount: 0,
-  followupCount: 0,
-  pendingFollowups: 0,
-  todayPending: 0,
-  todaySchedules: 0
-});
+const dashboardStore = useDashboardStore();
+const followupStore = useFollowupStore();
 
-const recentFollowups = ref([]);
-const todaySchedules = ref([]);
-const todayPending = ref([]);
+const stats = computed(() => dashboardStore.stats);
+const recentFollowups = computed(() => dashboardStore.recentFollowups);
+const todaySchedules = computed(() => dashboardStore.todaySchedules);
+const todayPending = computed(() => dashboardStore.todayPending);
 
 const completeDialogVisible = ref(false);
 const completeLoading = ref(false);
@@ -239,66 +239,8 @@ const completeId = ref(null);
 const detailVisible = ref(false);
 const detailData = ref({});
 
-const getStatusType = (status) => {
-  const map = {
-    pending: 'warning',
-    completed: 'success',
-    cancelled: 'info'
-  };
-  return map[status] || 'info';
-};
-
-const getStatusText = (status) => {
-  const map = {
-    pending: '待随访',
-    completed: '已完成',
-    cancelled: '已取消'
-  };
-  return map[status] || status;
-};
-
-const getScheduleTypeText = (type) => {
-  const map = {
-    followup: '随访',
-    clinic: '门诊',
-    meeting: '会议',
-    other: '其他'
-  };
-  return map[type] || type;
-};
-
-const getFollowupTypeTag = (type) => {
-  const map = {
-    '电话随访': 'primary',
-    '门诊随访': 'success',
-    '上门随访': 'warning',
-    '微信随访': 'info',
-    '其他': 'info'
-  };
-  return map[type] || 'info';
-};
-
 const loadData = async () => {
-  try {
-    const [patientsRes, followupsRes, schedulesRes, todayPendingRes] = await Promise.all([
-      getPatientList({ page: 1, pageSize: 100 }),
-      getFollowupList({ page: 1, pageSize: 100 }),
-      getScheduleList({ startDate: dayjs().format('YYYY-MM-DD'), endDate: dayjs().format('YYYY-MM-DD') }),
-      getTodayPendingFollowups()
-    ]);
-
-    stats.value.patientCount = patientsRes.data.total;
-    stats.value.followupCount = followupsRes.data.total;
-    stats.value.pendingFollowups = followupsRes.data.list.filter(f => f.status === 'pending').length;
-    stats.value.todaySchedules = schedulesRes.data.length;
-    stats.value.todayPending = todayPendingRes.data.length;
-
-    todayPending.value = todayPendingRes.data.map(item => ({ ...item, completed: false }));
-    recentFollowups.value = followupsRes.data.list.slice(0, 6);
-    todaySchedules.value = schedulesRes.data;
-  } catch (e) {
-    console.error('加载数据失败', e);
-  }
+  await dashboardStore.loadStats();
 };
 
 const handleTodoComplete = (item, val) => {
@@ -323,13 +265,12 @@ const handleCompleteFromDetail = () => {
 const submitComplete = async () => {
   completeLoading.value = true;
   try {
-    await updateFollowupStatus(completeId.value, {
-      status: 'completed',
+    await dashboardStore.markTodoCompleted(completeId.value, {
       result: completeForm.result
     });
     ElMessage.success('随访已完成');
     completeDialogVisible.value = false;
-    loadData();
+    await loadData();
   } catch (e) {
     console.error(e);
   } finally {

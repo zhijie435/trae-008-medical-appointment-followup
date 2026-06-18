@@ -439,29 +439,37 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue';
+import { ref, reactive, onMounted, watch, computed } from 'vue';
+import { storeToRefs } from 'pinia';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { getPatientList, createPatient, updatePatient, deletePatient, getPatientDepartments } from '@/api/patients';
-import { getFollowupsByPatient, createFollowup, updateFollowupStatus } from '@/api/followups';
-import { getScheduleDoctors } from '@/api/schedules';
+import { usePatientStore } from '@/stores/patient.js';
+import { useFollowupStore } from '@/stores/followup.js';
+import { useScheduleStore } from '@/stores/schedule.js';
+import {
+  getPatientStatusType,
+  getPatientStatusText,
+  getFollowupStatusType,
+  getFollowupStatusText,
+  getFollowupTypeTag,
+  getTimelineType
+} from '@/utils/helpers.js';
 import dayjs from 'dayjs';
 
-const loading = ref(false);
+const patientStore = usePatientStore();
+const followupStore = useFollowupStore();
+const scheduleStore = useScheduleStore();
+
+const { list: tableData, departments: departmentList, pagination } = storeToRefs(patientStore);
+const { patientFollowups } = storeToRefs(followupStore);
+const { doctors: doctorList } = storeToRefs(scheduleStore);
+
+const loading = computed(() => patientStore.loading);
 const submitLoading = ref(false);
-const tableData = ref([]);
-const departmentList = ref([]);
-const doctorList = ref([]);
 
 const searchForm = reactive({
   keyword: '',
   status: '',
   department: ''
-});
-
-const pagination = reactive({
-  page: 1,
-  pageSize: 10,
-  total: 0
 });
 
 const dialogVisible = ref(false);
@@ -503,7 +511,6 @@ const summaryForm = reactive({
   notes: ''
 });
 
-const patientFollowups = ref([]);
 const followupDetailVisible = ref(false);
 const currentFollowup = ref({});
 const completeFollowupVisible = ref(false);
@@ -513,88 +520,40 @@ const completeFollowupForm = reactive({
   next_followup_date: ''
 });
 
+const PATIENT_STATUS_VALUES = ['active', 'discharged', 'inactive'];
+
 const getStatusType = (status) => {
-  const map = {
-    active: 'success',
-    discharged: 'info',
-    inactive: 'warning'
-  };
-  return map[status] || 'info';
+  if (PATIENT_STATUS_VALUES.includes(status)) {
+    return getPatientStatusType(status);
+  }
+  return getFollowupStatusType(status);
 };
 
 const getStatusText = (status) => {
-  const map = {
-    active: '活跃',
-    discharged: '已出院',
-    inactive: '其他'
-  };
-  return map[status] || status;
-};
-
-const getTimelineType = (status) => {
-  const map = {
-    pending: 'warning',
-    completed: 'success',
-    cancelled: 'info'
-  };
-  return map[status] || 'primary';
-};
-
-const getFollowupTypeTag = (type) => {
-  const map = {
-    '电话随访': 'primary',
-    '门诊随访': 'success',
-    '上门随访': 'warning',
-    '微信随访': 'info',
-    '其他': 'info'
-  };
-  return map[type] || 'info';
+  if (PATIENT_STATUS_VALUES.includes(status)) {
+    return getPatientStatusText(status);
+  }
+  return getFollowupStatusText(status);
 };
 
 const loadData = async () => {
-  loading.value = true;
-  try {
-    const res = await getPatientList({
-      page: pagination.page,
-      pageSize: pagination.pageSize,
-      keyword: searchForm.keyword,
-      status: searchForm.status,
-      department: searchForm.department
-    });
-    tableData.value = res.data.list;
-    pagination.total = res.data.total;
-  } catch (e) {
-    console.error(e);
-  } finally {
-    loading.value = false;
-  }
+  await patientStore.fetchList({
+    keyword: searchForm.keyword,
+    status: searchForm.status,
+    department: searchForm.department
+  });
 };
 
 const loadPatientFollowups = async (patientId) => {
-  try {
-    const res = await getFollowupsByPatient(patientId);
-    patientFollowups.value = res.data;
-  } catch (e) {
-    console.error(e);
-  }
+  await followupStore.fetchByPatient(patientId, true);
 };
 
 const loadDepartments = async () => {
-  try {
-    const res = await getPatientDepartments();
-    departmentList.value = res.data || [];
-  } catch (e) {
-    console.error(e);
-  }
+  await patientStore.fetchDepartments();
 };
 
 const loadDoctors = async () => {
-  try {
-    const res = await getScheduleDoctors();
-    doctorList.value = res.data || [];
-  } catch (e) {
-    console.error(e);
-  }
+  await scheduleStore.fetchDoctors();
 };
 
 watch(detailVisible, (val) => {
@@ -604,7 +563,7 @@ watch(detailVisible, (val) => {
 });
 
 const handleSearch = () => {
-  pagination.page = 1;
+  patientStore.pagination.page = 1;
   loadData();
 };
 
@@ -612,7 +571,7 @@ const handleReset = () => {
   searchForm.keyword = '';
   searchForm.status = '';
   searchForm.department = '';
-  pagination.page = 1;
+  patientStore.pagination.page = 1;
   loadData();
 };
 
@@ -682,7 +641,7 @@ const handleQuickAddFollowup = () => {
     type: 'info'
   }).then(async () => {
     try {
-      await createFollowup(newFollowup);
+      await followupStore.create(newFollowup);
       ElMessage.success('随访记录创建成功，请在随访管理中完善内容');
       loadPatientFollowups(currentId.value);
       detailVisible.value = true;
@@ -714,12 +673,12 @@ const submitCompleteFollowup = async () => {
   }
   completeFollowupLoading.value = true;
   try {
-    await updateFollowupStatus(currentFollowup.value.id, {
+    await followupStore.updateStatus(currentFollowup.value.id, {
       status: 'completed',
       result: completeFollowupForm.result
     });
     if (completeFollowupForm.next_followup_date) {
-      await createFollowup({
+      await followupStore.create({
         patient_id: currentFollowup.value.patient_id,
         followup_date: completeFollowupForm.next_followup_date,
         followup_type: currentFollowup.value.followup_type,
@@ -744,13 +703,14 @@ const submitCompleteFollowup = async () => {
 const submitSummary = async () => {
   summaryLoading.value = true;
   try {
-    await updatePatient(currentId.value, {
+    await patientStore.update(currentId.value, {
       ...detailData.value,
       diagnosis: summaryForm.diagnosis,
       department: summaryForm.department,
       doctor: summaryForm.doctor,
       notes: summaryForm.notes
     });
+    patientStore.clearCache();
     detailData.value.diagnosis = summaryForm.diagnosis;
     detailData.value.department = summaryForm.department;
     detailData.value.doctor = summaryForm.doctor;
@@ -781,10 +741,12 @@ const handleSubmit = async () => {
       submitLoading.value = true;
       try {
         if (dialogType.value === 'add') {
-          await createPatient(formData);
+          await patientStore.create(formData);
+          patientStore.clearCache();
           ElMessage.success('新增成功');
         } else {
-          await updatePatient(currentId.value, formData);
+          await patientStore.update(currentId.value, formData);
+          patientStore.clearCache();
           ElMessage.success('更新成功');
         }
         dialogVisible.value = false;
@@ -805,7 +767,8 @@ const handleDelete = (row) => {
     type: 'warning'
   }).then(async () => {
     try {
-      await deletePatient(row.id);
+      await patientStore.remove(row.id);
+      patientStore.clearCache();
       ElMessage.success('删除成功');
       loadData();
     } catch (e) {

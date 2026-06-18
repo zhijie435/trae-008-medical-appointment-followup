@@ -418,30 +418,28 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue';
+import { storeToRefs } from 'pinia';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import dayjs from 'dayjs';
+import { useScheduleStore } from '@/stores/schedule.js';
+import { usePatientStore } from '@/stores/patient.js';
 import {
-  getScheduleList,
-  getMonthSchedule,
-  createSchedule,
-  updateSchedule,
-  deleteSchedule,
-  getScheduleDepartments,
-  getScheduleDoctors,
-  checkScheduleConflict
-} from '@/api/schedules';
-import { getAllPatients } from '@/api/patients';
+  getScheduleStatusType,
+  getScheduleStatusText,
+  getScheduleTypeTag,
+  getScheduleTypeText
+} from '@/utils/helpers.js';
+
+const scheduleStore = useScheduleStore();
+const patientStore = usePatientStore();
+
+const { list: listData, monthSchedules: scheduleList, departments: departmentList, doctors: doctorList, conflictWarn } = storeToRefs(scheduleStore);
+const { allPatients: patientList } = storeToRefs(patientStore);
 
 const viewMode = ref('calendar');
-const loading = ref(false);
 const submitLoading = ref(false);
 const currentDate = ref(dayjs());
-const scheduleList = ref([]);
-const listData = ref([]);
-const patientList = ref([]);
-const departmentList = ref([]);
-const doctorList = ref([]);
-const conflictWarn = ref([]);
+const loading = computed(() => scheduleStore.loading);
 let conflictTimer = null;
 
 const weekDays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
@@ -528,62 +526,19 @@ const formRules = {
 const detailVisible = ref(false);
 const detailData = ref({});
 
-const getTypeText = (type) => {
-  const map = {
-    followup: '随访',
-    clinic: '门诊',
-    meeting: '会议',
-    other: '其他'
-  };
-  return map[type] || type;
-};
-
-const getTypeTagType = (type) => {
-  const map = {
-    followup: 'primary',
-    clinic: 'success',
-    meeting: 'warning',
-    other: 'info'
-  };
-  return map[type] || 'info';
-};
-
-const getStatusType = (status) => {
-  const map = {
-    scheduled: 'primary',
-    ongoing: 'warning',
-    completed: 'success',
-    cancelled: 'info'
-  };
-  return map[status] || 'info';
-};
-
-const getStatusText = (status) => {
-  const map = {
-    scheduled: '已排',
-    ongoing: '进行中',
-    completed: '已完成',
-    cancelled: '已取消'
-  };
-  return map[status] || status;
-};
+const getTypeText = (type) => getScheduleTypeText(type);
+const getTypeTagType = (type) => getScheduleTypeTag(type);
+const getStatusType = (status) => getScheduleStatusType(status);
+const getStatusText = (status) => getScheduleStatusText(status);
 
 const loadMonthData = async () => {
-  loading.value = true;
-  try {
-    const year = currentDate.value.year();
-    const month = currentDate.value.month() + 1;
-    const res = await getMonthSchedule(year, month, {
-      department: searchForm.department,
-      type: searchForm.type,
-      status: searchForm.status
-    });
-    scheduleList.value = res.data;
-  } catch (e) {
-    console.error(e);
-  } finally {
-    loading.value = false;
-  }
+  const year = currentDate.value.year();
+  const month = currentDate.value.month() + 1;
+  await scheduleStore.fetchMonth(year, month, {
+    department: searchForm.department,
+    type: searchForm.type,
+    status: searchForm.status
+  });
 };
 
 const handleCalendarReset = () => {
@@ -595,56 +550,33 @@ const handleCalendarReset = () => {
 };
 
 const loadList = async () => {
-  loading.value = true;
-  try {
-    const res = await getScheduleList({
-      keyword: searchForm.keyword,
-      type: searchForm.type,
-      status: searchForm.status,
-      department: searchForm.department
-    });
-    listData.value = res.data;
-  } catch (e) {
-    console.error(e);
-  } finally {
-    loading.value = false;
-  }
+  await scheduleStore.fetchList({
+    keyword: searchForm.keyword,
+    type: searchForm.type,
+    status: searchForm.status,
+    department: searchForm.department
+  });
 };
 
 const loadPatients = async () => {
-  try {
-    const res = await getAllPatients();
-    patientList.value = res.data;
-  } catch (e) {
-    console.error(e);
-  }
+  await patientStore.fetchAll();
 };
 
 const loadDepartments = async () => {
-  try {
-    const res = await getScheduleDepartments();
-    departmentList.value = res.data || [];
-  } catch (e) {
-    console.error(e);
-  }
+  await scheduleStore.fetchDepartments(true);
 };
 
 const loadDoctors = async (department = '') => {
-  try {
-    const res = await getScheduleDoctors(department);
-    doctorList.value = res.data || [];
-  } catch (e) {
-    console.error(e);
-  }
+  await scheduleStore.fetchDoctors(department, true);
 };
 
 const runConflictCheck = async () => {
   if (!formData.date || !formData.start_time) {
-    conflictWarn.value = [];
+    scheduleStore.clearConflictWarn();
     return;
   }
   try {
-    const res = await checkScheduleConflict({
+    await scheduleStore.checkConflict({
       date: formData.date,
       start_time: formData.start_time,
       end_time: formData.end_time,
@@ -653,9 +585,8 @@ const runConflictCheck = async () => {
       patient_id: formData.patient_id,
       exclude_id: dialogType.value === 'edit' ? currentId.value : null
     });
-    conflictWarn.value = res.data?.conflicts || [];
   } catch (e) {
-    conflictWarn.value = [];
+    scheduleStore.clearConflictWarn();
   }
 };
 
@@ -718,7 +649,7 @@ const resetForm = () => {
 const handleAdd = async () => {
   dialogType.value = 'add';
   dialogTitle.value = '新增排班';
-  conflictWarn.value = [];
+  scheduleStore.clearConflictWarn();
   if (!formData.date) {
     formData.date = dayjs().format('YYYY-MM-DD');
   }
@@ -730,7 +661,7 @@ const handleAdd = async () => {
 const handleEdit = async (row) => {
   dialogType.value = 'edit';
   dialogTitle.value = '编辑排班';
-  conflictWarn.value = [];
+  scheduleStore.clearConflictWarn();
   currentId.value = row.id;
   Object.assign(formData, row);
   if (departmentList.value.length === 0) await loadDepartments();
@@ -787,12 +718,13 @@ const handleSubmit = async () => {
       submitLoading.value = true;
       try {
         if (dialogType.value === 'add') {
-          await createSchedule(formData);
+          await scheduleStore.create(formData);
           ElMessage.success('新增成功');
         } else {
-          await updateSchedule(currentId.value, formData);
+          await scheduleStore.update(currentId.value, formData);
           ElMessage.success('更新成功');
         }
+        scheduleStore.clearCache();
         dialogVisible.value = false;
         if (viewMode.value === 'calendar') {
           loadMonthData();
@@ -828,7 +760,8 @@ const handleDelete = (row) => {
     type: 'warning'
   }).then(async () => {
     try {
-      await deleteSchedule(row.id);
+      await scheduleStore.remove(row.id);
+      scheduleStore.clearCache();
       ElMessage.success('删除成功');
       if (viewMode.value === 'calendar') {
         loadMonthData();

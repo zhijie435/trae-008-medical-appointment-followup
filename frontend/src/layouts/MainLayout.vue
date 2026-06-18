@@ -56,20 +56,20 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
+import request from '@/utils/request.js';
+import { MENU_ITEMS } from '@/constants/index.js';
 
 const route = useRoute();
-
-const menuItems = [
-  { path: '/dashboard', title: '首页概览', icon: 'HomeFilled' },
-  { path: '/patients', title: '病例管理', icon: 'User' },
-  { path: '/followups', title: '随访管理', icon: 'Document' },
-  { path: '/schedule', title: '排班管理', icon: 'Calendar' }
-];
+const menuItems = MENU_ITEMS;
 
 const activeMenu = computed(() => route.path);
 const currentTitle = computed(() => route.meta.title || '');
+
+onUnmounted(() => {
+  request.cancelAll();
+});
 </script>
 
 <style scoped>

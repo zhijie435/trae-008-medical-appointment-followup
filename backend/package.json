@@ -6,16 +6,28 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:watch": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --watch",
+    "test:coverage": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --coverage"
+  },
+  "jest": {
+    "transform": {},
+    "testMatch": ["**/tests/**/*.test.js"],
+    "testEnvironment": "node",
+    "moduleFileExtensions": ["js", "json"]
   },
   "dependencies": {
-    "fastify": "^4.26.0",
     "@fastify/cors": "^9.0.1",
     "@fastify/static": "^7.0.1",
     "better-sqlite3": "^9.4.3",
-    "dayjs": "^1.11.10"
+    "dayjs": "^1.11.10",
+    "fastify": "^4.26.0"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "cross-env": "^10.1.0",
+    "jest": "^30.4.2",
     "nodemon": "^3.0.3"
   }
 }
