@@ -415,6 +415,23 @@ const loadDepartments = async () => {
   }
 };
 
+const loadDoctors = async () => {
+  try {
+    const res = await getScheduleDoctors();
+    doctorList.value = res.data || [];
+  } catch (e) {
+    console.error(e);
+  }
+};
+
+const handlePatientChange = (patientId) => {
+  const patient = patientList.value.find(p => p.id === patientId);
+  if (patient) {
+    formData.department = patient.department || '';
+    formData.doctor = patient.doctor || '';
+  }
+};
+
 const handleSearch = () => {
   pagination.page = 1;
   loadData();
@@ -435,6 +452,7 @@ const resetForm = () => {
   formData.content = '';
   formData.result = '';
   formData.next_followup_date = '';
+  formData.department = '';
   formData.doctor = '';
   formData.status = 'pending';
   formData.notes = '';
@@ -540,6 +558,7 @@ onMounted(() => {
   loadData();
   loadPatients();
   loadDepartments();
+  loadDoctors();
 });
 </script>
 
