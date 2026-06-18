@@ -881,6 +881,11 @@ onMounted(() => {
   border-radius: 8px;
   padding: 16px;
   border: 1px solid #ebeef5;
+  max-height: 400px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .notes-text {
@@ -888,6 +893,8 @@ onMounted(() => {
   color: #606266;
   white-space: pre-wrap;
   font-size: 14px;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .timeline-header {
@@ -980,6 +987,14 @@ onMounted(() => {
   white-space: pre-wrap;
   min-height: 40px;
   color: #606266;
+  max-height: 300px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  padding: 8px 12px;
+  background-color: #fafafa;
+  border-radius: 6px;
 }
 
 .patient-detail-dialog :deep(.el-dialog__body) {

@@ -568,5 +568,13 @@ onMounted(() => {
   line-height: 1.6;
   white-space: pre-wrap;
   min-height: 40px;
+  max-height: 300px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  padding: 8px 12px;
+  background-color: #fafafa;
+  border-radius: 6px;
 }
 </style>
